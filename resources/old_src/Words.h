@@ -5,19 +5,16 @@
 #include <vector>
 #include <fstream>
 #include <sstream> // For istringstream, referenced from https://cplusplus.com/reference/sstream/istringstream/str
-#include <cmath>
 using namespace std;
 
-// Single word object.
+// Single word object. Contains a word and a float vector of dim = 100.
 struct WordVector {
   string word;
-  void setWord(string word) {this->word = word;}
-  string getWord() const {return this->word;}
-
-  // Float vector of dimension 100.
   vector<float> vec;
+  void setWord(string word) {this->word = word;}
   void setVec(vector<float> vec) {this->vec = vec;}
-  vector<float> getVec() const {return this->vec;}
+  string getWord() {return this->word;}
+  vector<float> getVec() {return this->vec;}
 };
 
 // Loads words and vectors from the GloVe txt file.
@@ -30,6 +27,7 @@ class Words {
     void printWords();
     void printWordsRange(int range);
     WordVector findWord(string w);
+    float cosine_similarity(string word1, string word2);
     const vector<WordVector>& getWords() {return words;}
 };
 
@@ -43,11 +41,8 @@ void Words::normalizeWords() {
     }
     sum = sqrt(sum);
 
-    // Normalize each WordVector - v_norm = v / ||v|| = v / sum. If sum = 0, continue.
+    // Normalize each WordVector - v_norm = v / ||v|| = v / sum
     for (int k = 0; k < words[i].vec.size(); k++) {
-      if (sum == 0) {
-        continue;
-      }
       words[i].vec[k] = words[i].vec[k] / sum;
     }
   }
@@ -59,7 +54,6 @@ void Words::loadWords(string fileName) {
   wordstxt.open(fileName);
   if (!wordstxt.is_open()) {
     cerr << "Error opening file " << fileName << endl;
-    return;
   }
 
   string line;
@@ -116,8 +110,20 @@ WordVector Words::findWord(string w) {
       return words[i];
     }
   }
-  cout << "Error: Word not found" << endl;
-  return WordVector();
+  return words[0];
+}
+
+// cosine_similarity(u, v) = u_norm (dot) v_norm = ((u_norm_1 * v_norm_1) + (u_norm_2 * v_norm_2) * ... * (u_norm_n * v_norm_n))
+float Words::cosine_similarity(string word1, string word2) {
+  WordVector w1 = findWord(word1);
+  WordVector w2 = findWord(word2);
+  vector<float> vec1 = w1.vec;
+  vector<float> vec2 = w2.vec;
+  float sum = 0;
+  for (int i = 0; i < vec1.size(); i++) {
+    sum += (vec1[i] * vec2[i]);
+  }
+  return sum;
 }
 
 #endif //WORDS_H

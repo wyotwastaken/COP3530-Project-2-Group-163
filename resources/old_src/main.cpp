@@ -10,11 +10,12 @@ int main() {
     words.printWordsRange(10);
     cout << endl;
 
+    // Example cosine similarity usage. Range: [-1, 1]. ~1 implies semantically similar, ~0 implies semantically unrelated, ~-1 implies semantically dissimilar
+    cout << "cosine similarity of 'the' and 'a': " << words.cosine_similarity("the", "a");
+
     // Construct Ball Tree
-    cout << "Constructing ball tree..." << endl;
     BallTree ball_tree;
-    ball_tree.constructBalltree(words.getWords(), words);
-    cout << "Ball tree constructed!" << endl;
+    ball_tree.constructBalltree(words.getWords());
 
     cout << "Root radius: " << ball_tree.getRoot()->getRadius() << endl;
     return 0;

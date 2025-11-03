@@ -3,6 +3,7 @@
 #include <iostream>
 #include "Words.h"
 #include <vector>
+#include <cmath>
 using namespace std;
 
 struct BallTreeNode {
@@ -21,36 +22,38 @@ struct BallTreeNode {
 class BallTree {
   private:
     BallTreeNode *root;
-    Words words;
-    int max_leaf_size = 20; // Can be changed.
+    int max_leaf_size = 20; // Can be changed. Currently being not used
   public:
     // Helper Functions:
     // Computes the lowest cosine similarity (ie closest to -1) comparing an input word to other vectors.
-    WordVector lowestCosSimilarity(WordVector input_word, vector<WordVector> word_list);
+    WordVector lowestCosSimilarity(const WordVector input_word, const vector<WordVector> word_list);
 
     // Normalizes an input vector
     vector<float> normalize(vector<float>& input);
 
     // Returns the average vector of a vector of WordVectors
-    vector<float> average(vector<WordVector> input_words);
+    vector<float> average(const vector<WordVector>& input_words);
 
-    // Computes the cosine similarity of the pivot and some WordVector
-    float pivot_word_cosine_similarity(vector<float> p, WordVector w);
+    // Computes the cosine similarity of two vectors.
+    float cosine_similarity(const vector<float>& a, const vector<float>& b);
+
+    // Main ball tree constructor:
+    BallTreeNode* constructBalltreeHelper(const vector<WordVector>& words, Words& all_words);
 
     // Getters:
     BallTreeNode *getRoot() {return root;}
 
     // Main Methods:
-    BallTreeNode* constructBalltree(vector<WordVector> words);
+    void constructBalltree(const vector<WordVector>& words, Words& all_words);
 };
 
-WordVector BallTree::lowestCosSimilarity(WordVector input_word, vector<WordVector> word_list) {
+WordVector BallTree::lowestCosSimilarity(const WordVector input_word, const vector<WordVector> word_list_vector) {
   WordVector most_semantically_dissimilar;
   float lowest_cos_similarity = 1;
-  for (int i = 0; i < word_list.size(); i++) {
-    float cos_sim = words.cosine_similarity(input_word.getWord(), word_list[i].getWord());
+  for (int i = 0; i < word_list_vector.size(); i++) {
+    float cos_sim = cosine_similarity(input_word.vec, word_list_vector[i].vec);
     if (cos_sim < lowest_cos_similarity) {
-      most_semantically_dissimilar = word_list[i];
+      most_semantically_dissimilar = word_list_vector[i];
       lowest_cos_similarity = cos_sim;
     }
   }
@@ -70,7 +73,7 @@ vector<float> BallTree::normalize(vector<float>& input) {
   return input;
 }
 
-vector<float> BallTree::average(vector<WordVector> input_words) {
+vector<float> BallTree::average(const vector<WordVector>& input_words) {
   vector<float> output(100);
   for (int i = 0; i < input_words.size(); i++) {
     for (int j = 0; j < input_words[i].vec.size(); j++) {
@@ -83,35 +86,22 @@ vector<float> BallTree::average(vector<WordVector> input_words) {
   return output;
 }
 
-float BallTree::pivot_word_cosine_similarity(vector<float> p, WordVector w) {
+float BallTree::cosine_similarity(const vector<float>& a, const vector<float>& b) {
   float sum = 0;
-  for (int i = 0; i < p.size(); i++) {
-    sum += (p[i] * w.vec[i]);
+  for (int i = 0; i < a.size(); i++) {
+    sum += (a[i] * b[i]);
   }
   return sum;
 }
 
-
-// Psuedocode source: https://en.wikipedia.org/wiki/Ball_tree
-// funcction constructBalltree is input: D, an array of data points. output: B, the root of the constructed ball tree.
-BallTreeNode* BallTree::constructBalltree(vector<WordVector> words) {
-  /* Base case:
-  if a single point remains then
+/* Psuedocode source: https://en.wikipedia.org/wiki/Ball_tree
+Input: D, an array of data points, [Loaded word list]. output: B, the root of the constructed ball tree.
+Base case:
+ if a single point remains then
     create a leaf B containing a single point in D
     return B
-  */
-  if (words.size() == 0) {
-    return nullptr;
-  }
-  if (words.size() == 1) {
-    BallTreeNode *root = new BallTreeNode();
-    root->setWords(words);
-    return root;
-  }
-
-  /*
-  else:
-  let c be the dimension of greatest spread
+else:
+    let c be the dimension of greatest spread
         let p be the central point selected considering c
         let L, R be the sets of points lying to the left and right of the median along dimension c
         create B with two children:
@@ -120,50 +110,75 @@ BallTreeNode* BallTree::constructBalltree(vector<WordVector> words) {
             B.child2 := construct_balltree(R),
             let B.radius be maximum distance from p among children
         return B
-  */
-  else {
-    // Instantiate new root node
-    BallTreeNode *root = new BallTreeNode();
 
-    // Calculate the spread. For cosine similarity, its 2 points with the greatest angular distance.
-    // Logic for spread calculation obtained from 18:55 in https://www.youtube.com/watch?v=E1_WCdUAtyE
+Translated to cosine similarity/distance:
+1. Instantiate new root node
+2. Calculate the spread. For cosine similarity, its 2 points with the greatest angular distance.
+   (Logic for spread calculation obtained from 18:55 in https://www.youtube.com/watch?v=E1_WCdUAtyE)
+3. "let p be the central point selected considering c"
+    In this case, p is the normalized average of all vectors in words.
+    Use cosine distance for a "radius" measure. Source I used to learn about cosine distance: https://medium.com/@milana.shxanukova15/cosine-distance-and-cosine-similarity-a5da0e4d9ded
+4. "let L, R be the sets of points [with a with cosine similarities closest to A or B, respectively] along [spread A,B]"
+5. "B.pivot := p" == root.center := p (pivot)
+6. Check if L or R are empty to prevent infinite recursion. IMPORTANT: Since this is a leaf, the words must be set.
+7. Create B with two children:
+   "B.child1 := construct_balltree(L)" (root->left)
+   "B.child2 := construct_balltree(R)" (root->right)
+  */
+BallTreeNode* BallTree::constructBalltreeHelper(const vector<WordVector>& words, Words& all_words) {
+  if (words.size() == 0) {
+    return nullptr;
+  }
+  if (words.size() <= max_leaf_size) {
+    BallTreeNode *root = new BallTreeNode();
+    root->setWords(words);
+    return root;
+  }
+  else {
+    // (1)
+    BallTreeNode *root = new BallTreeNode();
+    // (2)
     WordVector A = lowestCosSimilarity(words[0], words);
     WordVector B = lowestCosSimilarity(A, words);
-
-    // let p be the central point selected considering c
-    // In this case, p is the normalized average of all vectors in words.
-    // Use cosine distance for a "radius" measure. Source I used to learn about cosine distance: https://medium.com/@milana.shxanukova15/cosine-distance-and-cosine-similarity-a5da0e4d9ded
+    // (3)
     vector<float> p = average(words);
     normalize(p);
-    root->center = p;
     float max_cos_distance = 0;
     for (int i = 0; i < words.size(); i++) {
-      float num = pivot_word_cosine_similarity(p, words[i]);
+      float num = cosine_similarity(p, words[i].vec);
       if (1-num > max_cos_distance) {
         max_cos_distance = 1-num; // Cosine distance
       }
     }
     root->radius = max_cos_distance;
-
-    // let L, R be the sets of points lying to the left and right of the median along dimension c
+    // (4)
     vector<WordVector> L;
     vector<WordVector> R;
     for (int i = 0; i < words.size(); i++) {
-      if (this->words.cosine_similarity(A.getWord(), words[i].getWord()) > this->words.cosine_similarity(B.getWord(), words[i].getWord())) {
+      if (cosine_similarity(A.vec, words[i].vec) > cosine_similarity(B.vec, words[i].vec)) {
         L.push_back(words[i]);
       }
       else {
         R.push_back(words[i]);
       }
     }
-    // B.pivot := p
+    // (5)
     root->center = p;
-
-    // create B with two children:
-    root->left = constructBalltree(L);
-    root->right = constructBalltree(R);
+    // (6)
+    cout << "Splitting " << words.size() << " words..." << endl; // remove later
+    if (L.empty() || R.empty()) {
+      root->setWords(words);
+      return root;
+    }
+    // (7)
+    root->left = constructBalltreeHelper(L, all_words);
+    root->right = constructBalltreeHelper(R, all_words);
     return root;
   }
+}
+
+void BallTree::constructBalltree(const vector<WordVector>& words, Words& all_words) {
+  root = constructBalltreeHelper(words, all_words);
 }
 
 #endif //BALLTREE_H
