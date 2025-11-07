@@ -5,7 +5,7 @@
 using namespace std;
 
 int main() {
-    // BEFORE RUNNING //
+    //// BEFORE RUNNING ////
     // 1) Drop word_list.txt into data folder.
     // 2) CHANGE word_txt to correct path under your data folder.
     string word_txt = "/Users/wyattscheinbaum/CLionProjects/COP3530-Project-2-Group-163/data/word_list.txt";
