@@ -4,7 +4,20 @@
 #include "Words.h"
 #include <vector>
 #include <cmath>
+#include <queue>
 using namespace std;
+
+// Object for comparing distances and WordVectors.
+struct knn_Node {
+  float distance;
+  WordVector word;
+
+  knn_Node(float d, WordVector& w) : distance(d), word(w) {}
+
+  bool operator< (const knn_Node &other) const {
+    return distance < other.distance;
+  }
+};
 
 struct BallTreeNode {
   BallTreeNode *left; // Left ball
@@ -34,17 +47,24 @@ class BallTree {
     // Returns the average vector of a vector of WordVectors
     vector<float> average(const vector<WordVector>& input_words);
 
-    // Computes the cosine similarity of two vectors.
+    // Computes the cosine similarity of two vectors
     float cosine_similarity(const vector<float>& a, const vector<float>& b);
+
+    // Computes the cosine distance of two vectors (1 - cosine_similarity(a, b))
+    float cosine_distance(const vector<float>& a, const vector<float>& b);
 
     // Main ball tree constructor:
     BallTreeNode* constructBalltreeHelper(const vector<WordVector>& words, Words& all_words);
+
+    // KNN search algorithm:
+    void knn_search_helper(const WordVector t, int k, priority_queue<knn_Node>& Q, BallTreeNode* B);
 
     // Getters:
     BallTreeNode *getRoot() {return root;}
 
     // Main Methods:
     void constructBalltree(const vector<WordVector>& words, Words& all_words);
+    priority_queue<knn_Node> knn_search(const WordVector t, int k);
 };
 
 WordVector BallTree::lowestCosSimilarity(const WordVector input_word, const vector<WordVector> word_list_vector) {
@@ -95,36 +115,20 @@ float BallTree::cosine_similarity(const vector<float>& a, const vector<float>& b
 }
 
 /* Psuedocode source: https://en.wikipedia.org/wiki/Ball_tree
-Input: D, an array of data points, [Loaded word list]. output: B, the root of the constructed ball tree.
-Base case:
- if a single point remains then
-    create a leaf B containing a single point in D
-    return B
-else:
-    let c be the dimension of greatest spread
-        let p be the central point selected considering c
-        let L, R be the sets of points lying to the left and right of the median along dimension c
-        create B with two children:
-            B.pivot := p
-            B.child1 := construct_balltree(L),
-            B.child2 := construct_balltree(R),
-            let B.radius be maximum distance from p among children
-        return B
-
-Translated to cosine similarity/distance:
-1. Instantiate new root node
-2. Calculate the spread. For cosine similarity, its 2 points with the greatest angular distance.
-   (Logic for spread calculation obtained from 18:55 in https://www.youtube.com/watch?v=E1_WCdUAtyE)
-3. "let p be the central point selected considering c"
-    In this case, p is the normalized average of all vectors in words.
-    Use cosine distance for a "radius" measure. Source I used to learn about cosine distance: https://medium.com/@milana.shxanukova15/cosine-distance-and-cosine-similarity-a5da0e4d9ded
-4. "let L, R be the sets of points [with a with cosine similarities closest to A or B, respectively] along [spread A,B]"
-5. "B.pivot := p" == root.center := p (pivot)
-6. Check if L or R are empty to prevent infinite recursion. IMPORTANT: Since this is a leaf, the words must be set.
-7. Create B with two children:
-   "B.child1 := construct_balltree(L)" (root->left)
-   "B.child2 := construct_balltree(R)" (root->right)
-  */
+    Translated to cosine similarity/distance (project context):
+    1. Instantiate new root node
+    2. Calculate the spread. For cosine similarity, its 2 points with the greatest angular distance.
+       (Logic for spread calculation obtained from 18:55 in https://www.youtube.com/watch?v=E1_WCdUAtyE)
+    3. "let p be the central point selected considering c"
+        In this case, p is the normalized average of all vectors in words.
+        Use cosine distance for a "radius" measure. Source I used to learn about cosine distance: https://medium.com/@milana.shxanukova15/cosine-distance-and-cosine-similarity-a5da0e4d9ded
+    4. "let L, R be the sets of points [with a with cosine similarities closest to A or B, respectively] along [spread A,B]"
+    5. "B.pivot := p" == root.center := p (pivot)
+    6. Check if L or R are empty to prevent infinite recursion. IMPORTANT: Since this is a leaf, the words must be set.
+    7. Create B with two children:
+       "B.child1 := construct_balltree(L)" (root->left)
+       "B.child2 := construct_balltree(R)" (root->right)
+*/
 BallTreeNode* BallTree::constructBalltreeHelper(const vector<WordVector>& words, Words& all_words) {
   if (words.size() == 0) {
     return nullptr;
@@ -132,6 +136,20 @@ BallTreeNode* BallTree::constructBalltreeHelper(const vector<WordVector>& words,
   if (words.size() <= max_leaf_size) {
     BallTreeNode *root = new BallTreeNode();
     root->setWords(words);
+
+    // Compute the center vector and radius of leaf nodes for knn_search.
+    vector<float> p = average(words);
+    normalize(p);
+    float max_cos_distance = 0;
+    for (int i = 0; i < words.size(); i++) {
+      float num = cosine_similarity(p, words[i].vec);
+      if (1-num > max_cos_distance) {
+        max_cos_distance = 1-num; // Cosine distance
+      }
+    }
+    root->radius = max_cos_distance;
+    root->center = p;
+
     return root;
   }
   else {
@@ -165,7 +183,10 @@ BallTreeNode* BallTree::constructBalltreeHelper(const vector<WordVector>& words,
     // (5)
     root->center = p;
     // (6)
-    cout << "Splitting " << words.size() << " words..." << endl; // remove later
+    // cout << "Splitting " << words.size() << " words..." << endl; // remove later
+    if (words.size() > 100000) {
+      cout << "." << flush;
+    }
     if (L.empty() || R.empty()) {
       root->setWords(words);
       return root;
@@ -179,6 +200,97 @@ BallTreeNode* BallTree::constructBalltreeHelper(const vector<WordVector>& words,
 
 void BallTree::constructBalltree(const vector<WordVector>& words, Words& all_words) {
   root = constructBalltreeHelper(words, all_words);
+}
+
+float BallTree::cosine_distance(const vector<float>& a, const vector<float>& b) {
+  return 1 - cosine_similarity(a, b);
+}
+
+/* Psuedocode source: https://en.wikipedia.org/wiki/Ball_tree
+    Translated to project context:
+    Note: Objects are stored as knn_Nodes, each having a calculated distance, WordVector, and < operator for min heap processing.
+    1) return immediately if B is a nullptr to avoid segfault.
+    2) else if B.left == nullptr and B.right == nullptr (B is a leaf) then, for each WordVector w in B.words:
+    2a) if cosine_distance(t.vec, w.vec) < cosine_distance(t.vec, Q.top().word.vec) then Q.push(w).
+    2b) if 2a was satisfied and Q.size() > k, then remove the element of Q with the greatest distance value.
+    3) if cosine_distance(t.vec, B.center) - B.radius >= cosine_distance(t.vec, Q.top().word.vec) then return Q unchanged.
+    (repeat for each WordVector x in B.words)
+    4) else (if neither 1 nor 2 were satisfied):
+    4a) if cosine_distance(t.vec, B.left.center) < cosine_distance(t.vec, B.right.center), then child1 = B.left, child2 = B.right.
+    4b) else child1 = B.right, child2 = B.left
+    5) recursively call knn_search(t, k, Q, child1) followed by knn_search(t, k, Q, child2).
+ */
+void BallTree::knn_search_helper(const WordVector t, int k, priority_queue<knn_Node>& Q, BallTreeNode* B) {
+  // (1)
+  if (B == nullptr) {
+    return;
+  }
+  // (2)
+  if (B->left == nullptr && B->right == nullptr) {
+    for (WordVector &w : B->words) {
+      // (2a)
+      float cos_dist = cosine_distance(t.vec, w.vec);
+      if (cos_dist < cosine_distance(t.vec, Q.top().word.vec)) {
+        Q.push(knn_Node(cos_dist, w));
+      }
+      // (2b)
+      if (Q.size() > k) {
+        Q.pop();
+      }
+    }
+  }
+  // (3)
+  else if (cosine_distance(t.vec, B->center) - B->radius >= cosine_distance(t.vec, Q.top().word.vec)) {
+    return;
+  }
+  // (4)
+  else {
+    BallTreeNode* child1;
+    BallTreeNode* child2;
+    // (4a)
+    if (cosine_distance(t.vec, B->left->center) < cosine_distance(t.vec, B->right->center)) {
+      child1 = B->left;
+      child2 = B->right;
+    }
+    // (4b)
+    else {
+      child1 = B->right;
+      child2 = B->left;
+    }
+    // (5)
+    knn_search_helper(t, k, Q, child1);
+    knn_search_helper(t, k, Q, child2);
+  }
+}
+
+priority_queue<knn_Node> BallTree::knn_search(const WordVector t, int k) {
+  priority_queue<knn_Node> Q;
+  cout << "Searching for " << t.getWord() << "'s nearest semantic neighbors..." << endl;
+  if (k <= 0) {
+    cout << "Error: knn search must be non-negative." << endl;
+    return Q;
+  }
+  cout << endl;
+
+  for (int i = 0; i < k; i++) {
+    WordVector w;
+    Q.push(knn_Node(3, w));
+  }
+  knn_search_helper(t, k+1, Q, getRoot());
+  int rank = 1;
+  vector<string> top_k_words;
+  vector<float> top_k_similarities;
+  cout << "Top " << k << " words semantically similar to " << t.getWord() << ":" << endl;
+  while (!Q.empty()) {
+    top_k_words.push_back(Q.top().word.getWord());
+    top_k_similarities.push_back(cosine_similarity(Q.top().word.vec, t.vec));
+    Q.pop();
+  }
+  int vec_size = top_k_words.size();
+  for (int i = vec_size-1; i > 0; i--) {
+    cout << "[" << rank++ << "] " << top_k_words[i] << " (similarity: " << top_k_similarities[i] << ")" << endl;
+  }
+  return Q;
 }
 
 #endif //BALLTREE_H

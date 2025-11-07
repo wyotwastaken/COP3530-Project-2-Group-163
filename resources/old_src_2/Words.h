@@ -10,12 +10,12 @@ using namespace std;
 
 // Single word object.
 struct WordVector {
-  string word = "";
+  string word;
   void setWord(string word) {this->word = word;}
   string getWord() const {return this->word;}
 
-  // Float vector of dimension 100. Initializes it as a dimension 100 vector of 0's.
-  vector<float> vec = vector<float>(100);
+  // Float vector of dimension 100.
+  vector<float> vec;
   void setVec(vector<float> vec) {this->vec = vec;}
   vector<float> getVec() const {return this->vec;}
 };
@@ -27,12 +27,10 @@ class Words {
   public:
     void loadWords(string fileName);
     void normalizeWords(); // For cosine similarity computation
-    WordVector findWord(string w);
-    const vector<WordVector>& getWords() {return words;}
-
-    // For debugging purposes //
     void printWords();
     void printWordsRange(int range);
+    WordVector findWord(string w);
+    const vector<WordVector>& getWords() {return words;}
 };
 
 void Words::normalizeWords() {
@@ -83,13 +81,32 @@ void Words::loadWords(string fileName) {
     }
     w.setVec(vec);
     words.push_back(w);
-    if (words.size() % 100000 == 0) {
-      cout << "." << flush; // Read about std::flush here: https://en.cppreference.com/w/cpp/io/manip/flush.html
-    }
   }
 
   // End by normalizing the word vectors for easy cosine similarity computation cos_sim(u, v) = u_norm (dot) v_norm.
   normalizeWords();
+}
+
+void Words::printWords() {
+  for (int i = 0; i < words.size(); i++) {
+    cout << "Word: " << words[i].word << endl;
+    cout << "Vector: ";
+    for (int j = 0; j < words[i].vec.size(); j++) {
+      cout << words[i].vec[j] << ", ";
+    }
+  }
+}
+
+void Words::printWordsRange(int range) {
+  for (int i = 0; i < range; i++) {
+    cout << "Word: " << words[i].word << endl;
+    cout << "Vector: ";
+    for (int j = 0; j < words[i].vec.size(); j++) {
+      cout << words[i].vec[j] << ", ";
+    }
+    cout << endl;
+    cout << endl;
+  }
 }
 
 // Returns a WordVector of a particular word. If its not found, the first word is returned.
@@ -101,30 +118,6 @@ WordVector Words::findWord(string w) {
   }
   cout << "Error: Word not found" << endl;
   return WordVector();
-}
-
-// For debugging purposes //
-void Words::printWords() {
-  for (int i = 0; i < words.size(); i++) {
-    cout << "Word: " << words[i].word << endl;
-    cout << "Vector: ";
-    for (int j = 0; j < words[i].vec.size(); j++) {
-      cout << words[i].vec[j] << ", ";
-    }
-  }
-}
-
-// For debugging purposes //
-void Words::printWordsRange(int range) {
-  for (int i = 0; i < range; i++) {
-    cout << "Word: " << words[i].word << endl;
-    cout << "Vector: ";
-    for (int j = 0; j < words[i].vec.size(); j++) {
-      cout << words[i].vec[j] << ", ";
-    }
-    cout << endl;
-    cout << endl;
-  }
 }
 
 #endif //WORDS_H
