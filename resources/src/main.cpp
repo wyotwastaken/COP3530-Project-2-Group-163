@@ -2,13 +2,15 @@
 #include <chrono>
 #include "BallTree.h"
 #include "Words.h"
+#include <algorithm>
+#include "KDTree.h"
 using namespace std;
 
 int main() {
     //// BEFORE RUNNING ////
     // 1) Drop word_list.txt into data folder.
     // 2) CHANGE word_txt to correct path under your data folder.
-    string word_txt = "/Users/wyattscheinbaum/CLionProjects/COP3530-Project-2-Group-163/data/word_list.txt";
+    string word_txt = "../data/word_list.txt";
 
     Words words;
     cout << "Loading words" << flush; // Read about std::flush here: https://en.cppreference.com/w/cpp/io/manip/flush.html
@@ -73,6 +75,43 @@ int main() {
         cout << endl;
         cout << "Execution time: " << ms_int_3 << " milliseconds" << endl;
         cout << endl;
+    }
+
+    cout << "Constructing KD tree" << flush;
+    KDTree kd(words.getWords(), 128);
+    kd.build();
+    cout << endl << "KD tree constructed!" << endl;
+
+    //input output
+    while(true) {
+        cout << "Enter new word to generate semantic neighbor list (type '0' to exit): ";
+        string w; if(!(cin >> w) || w == "0") break;
+
+        cout << "Enter number of neighbors to search: ";
+        int k; if(!(cin >> k) || k <= 0) {
+            cout << "Invalid k.\n"; continue;
+        }
+
+        //find the word in the word list
+        const auto& D = words.getWords();
+        int qi = -1;
+        for(int i = 0; i < (int)D.size(); ++i) {
+            if(D[i].word == w) {
+                qi = i; break;
+            }
+        }
+        if(qi < 0) {
+            cout << "Please enter a valid word...\n"; continue;
+        }
+
+        auto res = kd.knn(D[qi].vec, (size_t)k);
+        sort(res.begin(), res.end(), [](auto& a, auto& b){ return a.second > b.second; });
+        cout << "Searching for " << w << "'s nearest semantic neighbors..." << endl;
+        cout << "Top " << res.size() << " semantically closest words to " << w << " (K-D Tree implementation):\n";
+        for(size_t i = 0; i < res.size(); ++i) {
+            cout << "[" << (i+1) << "] " << D[res[i].first].word << "\n";
+        }
+        cout << "\n";
     }
     return 0;
 }

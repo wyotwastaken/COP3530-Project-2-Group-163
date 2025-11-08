@@ -280,7 +280,7 @@ priority_queue<knn_Node> BallTree::knn_search(const WordVector t, int k) {
   int rank = 1;
   vector<string> top_k_words;
   vector<float> top_k_similarities;
-  cout << "Top " << k << " words semantically similar to " << t.getWord() << ":" << endl;
+  cout << "Top " << k << " semantically closest words to " << t.getWord() << " (Ball Tree implementation):\n";
   while (!Q.empty()) {
     top_k_words.push_back(Q.top().word.getWord());
     top_k_similarities.push_back(cosine_similarity(Q.top().word.vec, t.vec));
@@ -288,7 +288,7 @@ priority_queue<knn_Node> BallTree::knn_search(const WordVector t, int k) {
   }
   int vec_size = top_k_words.size();
   for (int i = vec_size-1; i > 0; i--) {
-    cout << "[" << rank++ << "] " << top_k_words[i] << " (similarity: " << top_k_similarities[i] << ")" << endl;
+    cout << "[" << rank++ << "] " << top_k_words[i] /* << " (similarity: " << top_k_similarities[i] << ")" */<< endl;
   }
   return Q;
 }
