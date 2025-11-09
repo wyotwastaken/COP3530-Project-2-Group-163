@@ -1,0 +1,13 @@
+Information for running code:
+1. To access the dataset, go to this link: https://nlp.stanford.edu/projects/glove
+2. Download "**NEW!!** 2024 Wikipedia + Gigaword 5 (11.9B tokens, 1.2M vocab, uncased, 100d vectors, 560 MB download):"
+3. Rename the file "word_list.txt"
+4. Drop the file into the resources->data folder.
+5. You may now run the program!
+6. You must wait for the words/vectors, Ball Tree, and KD-Tree to be initialized when running main().
+7. After each tree is done loading, you will be prompted to enter a word, and then prompted to enter an integer.
+   Note: the first input is using the Ball Tree KNN search.
+8. IMPORTANT: make sure your word input is completely lowercase, or else it will not be found from the dataset.
+9. Press '0' to exit the Ball Tree KNN search into the KD-Tree KNN search.
+10. The prompt window will be the same as before, type a word and an integer to list the top semantically similar words.
+11. Press '0' again to end the program.
