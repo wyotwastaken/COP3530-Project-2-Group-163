@@ -3,7 +3,7 @@ Information for running code:
 2. Download "**NEW!!** 2024 Wikipedia + Gigaword 5 (11.9B tokens, 1.2M vocab, uncased, 100d vectors, 560 MB download):"
 3. Rename the file "word_list.txt"
 4. Drop the file into the resources->data folder.
-5. You may now run the program!
+5. Open main in the resources->src folder to run the program. IGNORE old_src_1 and old_src_2.
 6. You must wait for the words/vectors, Ball Tree, and KD-Tree to be initialized when running main().
 7. After each tree is done loading, you will be prompted to enter a word, and then prompted to enter an integer.
    Note: the first input is using the Ball Tree KNN search.
